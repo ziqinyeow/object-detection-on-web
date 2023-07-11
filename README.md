@@ -14,7 +14,7 @@ The models get loaded directly to client's browser to perform real-time inferenc
 
 1. next.js
 2. typescript
-3. tailwind Css
+3. tailwind css
 4. shadcnui
 5. tfjs
 
