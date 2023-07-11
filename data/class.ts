@@ -3,6 +3,7 @@ export const PRICE: any = {
   orange: 3.0,
   banana: 6.5,
   person: -10,
+  "cell phone": 7299,
 };
 
 // export interface ObjectDetectionClass {
