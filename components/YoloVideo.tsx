@@ -42,7 +42,7 @@ export default function Video() {
         (async () => {
             const _model = await tf.loadGraphModel("/model/yolov8s_web_model/model.json");
             setModel(_model);
-            console.log(_model.inputs);
+            console.log(_model);
         })();
     }, []);
 
@@ -108,8 +108,8 @@ export default function Video() {
     async function predictWebcam() {
         // @ts-ignore
         tf.engine().startScope();
-
-        const [input, xRatio, yRatio] = preprocess(videoRef.current, 640, 640)
+        const [modelHeight, modelWidth] = model?.inputs[0].shape.slice(1, 3);
+        const [input, xRatio, yRatio] = preprocess(videoRef.current, modelWidth, modelHeight)
 
         let res = model?.predict(input); // 1 x 84 x 8400
 
@@ -155,7 +155,7 @@ export default function Video() {
 
         const maxOutputSize = 100; // maximum count of the stated boxes that is to be picked
         const iouThreshold = 0.55;
-        const scoreThreshold = 0.2;
+        const scoreThreshold = 0.3;
         const nms = await tf.image.nonMaxSuppressionAsync(boxes, scores, maxOutputSize, iouThreshold, scoreThreshold); // NMS to filter boxes
 
         console.log("NMS boxes data: ", boxes.gather(nms, 0).shape)
