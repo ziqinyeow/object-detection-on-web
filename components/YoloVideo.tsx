@@ -40,9 +40,29 @@ export default function Video() {
 
     useEffect(() => {
         (async () => {
-            const _model = await tf.loadGraphModel("/model/yolov8s_web_model/model.json");
+            const _model = await tf.loadGraphModel(
+                "https://BUCKET.s3.amazonaws.com/public_models/pretrained-yolov8s-tfjs/model_manifest.json?AWSAccessKeyId=xxx&Signature=yyy&Expires=zzz",
+                {
+                    fetchFunc: async (path: string, init?: RequestInit) => {
+                        // use this to remove any appended query params by weightPathPrefix
+                        const pathSection = path.split("?")
+                        const validUrl = pathSection.slice(0, 2).join("?")
+
+                        const response = await fetch(validUrl, init);
+                        if (!response.ok) {
+                            throw new Error(`Failed to fetch ${path}: ${response.status} ${response.statusText}`);
+                        }
+                        return response;
+                    },
+                    requestInit: {
+                        cache: 'no-store'
+                    }
+                }
+            );
+            // const _model = await tf.loadGraphModel("/model/yolov8s_web_model/model.json");
             setModel(_model);
             console.log(_model);
+            console.log(_model.inputs)
         })();
     }, []);
 
@@ -108,8 +128,11 @@ export default function Video() {
     async function predictWebcam() {
         // @ts-ignore
         tf.engine().startScope();
+
         const [modelHeight, modelWidth] = model?.inputs[0].shape.slice(1, 3);
         const [input, xRatio, yRatio] = preprocess(videoRef.current, modelWidth, modelHeight)
+        // const [input, xRatio, yRatio] = preprocess(videoRef.current, 640, 640)
+        console.log(`input image ${input?.shape} ${input}`)
 
         let res = model?.predict(input); // 1 x 84 x 8400
 
