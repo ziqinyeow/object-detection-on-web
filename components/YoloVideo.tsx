@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import "@tensorflow/tfjs-backend-cpu";
-import "@tensorflow/tfjs-backend-webgl";
+// import "@tensorflow/tfjs-backend-webgl";
 import * as tf from "@tensorflow/tfjs";
 
 import { VideoIcon, VideoOff } from "lucide-react";
@@ -40,8 +40,9 @@ export default function Video() {
 
     useEffect(() => {
         (async () => {
+            // load model from a presigned URL
             const _model = await tf.loadGraphModel(
-                "https://BUCKET.s3.amazonaws.com/public_models/pretrained-yolov8s-tfjs/model_manifest.json?AWSAccessKeyId=xxx&Signature=yyy&Expires=zzz",
+                "https://BUCKET.s3.amazonaws.com/models/pretrained-yolov8s-tfjs/model_manifest.json?AWSAccessKeyId=xxx&Signature=yyy&Expires=zzz",
                 {
                     fetchFunc: async (path: string, init?: RequestInit) => {
                         // use this to remove any appended query params by weightPathPrefix
@@ -54,15 +55,16 @@ export default function Video() {
                         }
                         return response;
                     },
-                    requestInit: {
-                        cache: 'no-store'
-                    }
+                    // requestInit: {
+                    //     cache: 'no-store'
+                    // }
                 }
             );
+
+            // load model from local filesystem
             // const _model = await tf.loadGraphModel("/model/yolov8s_web_model/model.json");
             setModel(_model);
             console.log(_model);
-            console.log(_model.inputs)
         })();
     }, []);
 
@@ -131,16 +133,12 @@ export default function Video() {
 
         const [modelHeight, modelWidth] = model?.inputs[0].shape.slice(1, 3);
         const [input, xRatio, yRatio] = preprocess(videoRef.current, modelWidth, modelHeight)
-        // const [input, xRatio, yRatio] = preprocess(videoRef.current, 640, 640)
-        console.log(`input image ${input?.shape} ${input}`)
 
         let res = model?.predict(input); // 1 x 84 x 8400
 
         if (!res) return;
-        console.log("res", res.shape)
 
         const transRes = res.transpose([0, 2, 1]); // 1 x 8400 x 84
-        console.log("transRes", transRes.shape)
 
         // 8400 bounding boxes x (4 xywh + 80 classes) params = 8400 x 84
         // means each predicted image can have a maximum of 8400 bounding boxes
@@ -163,9 +161,7 @@ export default function Video() {
                     2
                 )
                 .squeeze();
-        }); // process boxes [y1, x1, w, h]
-
-        console.log("boxes", boxes.shape) // 8400 x 4
+        }); // process boxes [y1, x1, w, h], (8400 x 4)
 
         const [scores, classes] = tf.tidy(() => {
             // 8400 x 80, if numClass = 80 (notice the first 4 dims is being sliced out)
@@ -173,25 +169,14 @@ export default function Video() {
             return [rawScores.max(1), rawScores.argMax(1)]; // get the max value along the index 1
         }); // get max scores and classes index
 
-        console.log("SCORES", scores) // 8400
-        console.log("CLASSES", classes) // 8400
-
         const maxOutputSize = 100; // maximum count of the stated boxes that is to be picked
         const iouThreshold = 0.55;
         const scoreThreshold = 0.3;
         const nms = await tf.image.nonMaxSuppressionAsync(boxes, scores, maxOutputSize, iouThreshold, scoreThreshold); // NMS to filter boxes
 
-        console.log("NMS boxes data: ", boxes.gather(nms, 0).shape)
-        console.log("NMS scores data: ", scores.gather(nms, 0).shape)
-        console.log("NMS classes data: ", classes.gather(nms, 0).shape)
-
         const boxes_data = boxes.gather(nms, 0).arraySync(); // indexing boxes by nms index, then getting raw values and preserve the original shape of boxes
         const scores_data = scores.gather(nms, 0).dataSync(); // indexing scores by nms index
         const classes_data = classes.gather(nms, 0).dataSync(); // indexing classes by nms index
-
-        console.log("boxes_data", boxes_data)
-        console.log("scores_data", scores_data)
-        console.log("classes_data", classes_data)
 
         const multibbox = []
         for (let n = 0; n < scores_data.length; n++) {
@@ -203,8 +188,6 @@ export default function Video() {
             const _class = YOLO_CLASSES[classes_data[n]];
             multibbox.push([topLeftX, topLeftY, width, height, score, _class]);
         }
-
-        console.log("multibbox --->>>>", multibbox)
 
         setResults(multibbox);
 
